@@ -12,14 +12,21 @@ import torch
 from torch.utils.data import Dataset
 
 class AudioData(Dataset):
-    def __init__(self, track_list, x_len, y_len, bitrate=16, twos_comp=True):
+    def __init__(self, track_list, x_len, y_len, bitrate=16, twos_comp=True, store_tracks=False):
         self.data = []
+        self.tracks = []
         self.x_len = x_len
         self.y_len = y_len
         self.bitrate = bitrate
         self.twos_comp = twos_comp
         for track in track_list:
             audio, sample_rate = self.__load_audio_from_wav(track)
+
+            if store_tracks:
+                self.tracks.append({'name': track, 
+                                    'audio': audio, 
+                                    'sample_rate': sample_rate})
+
             for i in range(0, len(audio) - x_len - y_len, x_len + y_len):
                 x, y = self.__extract_segment(audio, x_len, y_len, start_idx=i)
                 self.data.append({'x': x, 'y': y})
