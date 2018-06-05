@@ -6,10 +6,12 @@ class MuEncoder(object):
         self.datarange = datarange
 
     def normalize(self, x):
-        return ((np.float32(x) - self.datarange[0]) / self.datarange[1] - 0.5) * 2
+        width = self.datarange[1] - self.datarange[0]
+        return ((np.float32(x) - self.datarange[0]) / width - 0.5) * 2
 
     def expand(self, x):
-        return (x / 2 + 0.5) * self.datarange[1] + self.datarange[0]
+        width = self.datarange[1] - self.datarange[0]
+        return (x / 2 + 0.5) * width + self.datarange[0]
 
     def encode(self, x):
         x = self.normalize(x)

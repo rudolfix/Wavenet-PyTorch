@@ -23,10 +23,11 @@ class AudioData(Dataset):
         self.n_channels = 1
         self.n_classes = 256
         self.bitrate = bitrate
+        self.datarange = (-2**(bitrate - 1), 2**(bitrate - 1) - 1)
         self.twos_comp = twos_comp
 
         if encoder is None:
-            self.encoder = MuEncoder((0, 2**bitrate - 1))
+            self.encoder = MuEncoder(self.datarange)
 
         for track in track_list:
             audio, dtype, sample_rate = self.__load_audio_from_wav(track)
@@ -48,6 +49,7 @@ class AudioData(Dataset):
                 y = self.quantize(y, label=True)
 
                 self.data.append({'x': x, 'y': y})
+                
         self.dtype = dtype
         self.sample_rate = sample_rate
     
@@ -62,14 +64,8 @@ class AudioData(Dataset):
         audio = np.array(audio)
         if len(audio.shape) > 1:
             audio = np.mean(audio, 1)
-        
-        # normalize to [-1, 1]
-        max_code = 2**self.bitrate
-        norm_factor = max_code/2.0
-        offset = (not self.twos_comp)*max_code
-        normed_audio = (audio - offset)/norm_factor
-        
-        return normed_audio, dtype, sample_rate
+
+        return audio, dtype, sample_rate
     
     def __extract_segment(self, audio, n_x, n_y, start_idx=None):
         n_samples = audio.shape[0]
@@ -104,14 +100,16 @@ class AudioData(Dataset):
         return scaled_audio
 
     def quantize(self, x, label=False):
-        n_bins = self.n_classes
-        bins = np.linspace(-1, 1, 256)
+        bins = np.linspace(-1, 1, self.n_classes)
         out = np.digitize(x, bins, right=False) - 1
 
         if not label:
             out = bins[out]
 
         return out
+
+    def label2value(self, label):
+        return np.linspace(-1, 1, self.n_classes)[label.data.numpy().astype(int)]
 
 
 class AudioBatchSampler(BatchSampler):
