@@ -1,8 +1,10 @@
-import matplotlib.pyplot as plt
+import time, copy
 import numpy as np
-from torch.nn import Conv1d, Softmax
+import matplotlib.pyplot as plt
+import torch
+from torch.nn import Module, Conv1d, Softmax
 
-class Model(object):
+class Model(Module):
     def __init__(self, 
                  num_time_samples,
                  num_channels=1,
@@ -11,7 +13,7 @@ class Model(object):
                  num_layers=14,
                  num_hidden=128,
                  kernel_size=2):
-        
+        super().__init__()
         self.num_time_samples = num_time_samples
         self.num_channels = num_channels
         self.num_classes = num_classes
@@ -19,7 +21,6 @@ class Model(object):
         self.num_layers = num_layers
         self.num_hidden = num_hidden
         self.kernel_size = kernel_size
-        self.gpu_fraction = gpu_fraction
 
         self.hs = []
         first = True
@@ -34,12 +35,64 @@ class Model(object):
                     h = Conv1d(num_hidden, num_hidden, kernel_size, dilation=rate)
                 self.hs.append(h) 
 
-        h_class = Conv1d(num_hidden, num_classes, kernel_size)
-        softmax = Softmax()
+        self.h_class = Conv1d(num_hidden, num_classes, kernel_size)
 
-        def forward(self, x):
-            for h in self.hs:
-                x = h(x)
+    def forward(self, x):
+        for h in self.hs:
+            x = h(x)
 
-            output = softmax(h_class(x))
-            return output
+        x = self.h_class(x)
+        return x
+
+    def train(self, dataloader, device=None, num_epochs=25, validation=False):
+        since = time.time()
+        
+        best_model_wts = copy.deepcopy(self.state_dict())
+        best_acc = 0.0
+        
+        if device is None:
+            device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.to(device)
+
+        if validation:
+            phase = 'Validation'
+        else:
+            phase = 'Training'
+
+        retain = True
+        for epoch in range(num_epochs):
+            # display epoch
+            print('Epoch {} / {}'.format(epoch, num_epochs - 1))
+            print('-' * 10)
+            
+            if not validation:
+                self.scheduler.step()
+                super().train()
+            else:
+                self.eval()
+                
+            # reset loss for current phase and epoch
+            running_loss = 0.0
+            running_corrects = 0
+            
+            for inputs, labels in dataloader:
+                inputs = torch.unsqueeze(inputs, 0).to(device)
+                labels = torch.unsqueeze(labels, 0).to(device)
+                
+                self.optimizer.zero_grad()
+                
+                # track history only during training phase
+                with torch.set_grad_enabled(not validation):
+                    outputs = self(inputs)
+                    
+                    loss = self.criterion(outputs, labels)
+                    
+                    if not validation:
+                        loss.backward()
+                        self.optimizer.step()
+                        
+                running_loss += loss.item() * inputs.size(1)
+                
+            epoch_loss = running_loss / len(dataloader)
+            print('{} Loss: {:.4f}'.format(phase, epoch_loss))
+            print()

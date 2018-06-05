@@ -9,7 +9,8 @@ import numpy as np
 from scipy.io import wavfile
 
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.sampler import RandomSampler, BatchSampler
 
 class AudioData(Dataset):
     def __init__(self, track_list, x_len, y_len, bitrate=16, twos_comp=True, store_tracks=False):
@@ -78,3 +79,12 @@ class AudioData(Dataset):
         offset = (not self.twos_comp)*1.0
         scaled_audio = (audio + offset)*norm_factor
         return scaled_audio
+
+class AudioBatchSampler(BatchSampler):
+    def __init__(self, dataset, batch_size, drop_last=True):
+        super().__init__(RandomSampler(dataset), batch_size, drop_last)
+
+class AudioLoader(DataLoader):
+    def __init__(self, dataset, batch_size=8, drop_last=True, num_workers=1):
+        sampler = AudioBatchSampler(dataset, batch_size, drop_last)
+        super().__init__(dataset, batch_sampler=sampler, num_workers=num_workers)
