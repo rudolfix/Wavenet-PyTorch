@@ -41,11 +41,7 @@ class Model(Module):
         self.h_class = Conv1d(num_hidden, num_classes, 1)
 
     def forward(self, x):
-        # for h in self.hs:
-        #     x = h(x)
-        x = self.hs(x)
-        x = self.h_class(x)
-        return x
+        return self.h_class(self.hs(x))
 
     def train(self, dataloader, device=None, num_epochs=25, validation=False):
         since = time.time()

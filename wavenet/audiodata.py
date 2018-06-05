@@ -49,7 +49,7 @@ class AudioData(Dataset):
                 y = self.quantize(y, label=True)
 
                 self.data.append({'x': x, 'y': y})
-                
+
         self.dtype = dtype
         self.sample_rate = sample_rate
     
