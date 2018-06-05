@@ -12,25 +12,43 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import RandomSampler, BatchSampler
 
+from .muencoder import MuEncoder
+
 class AudioData(Dataset):
-    def __init__(self, track_list, x_len, y_len, bitrate=16, twos_comp=True, store_tracks=False):
+    def __init__(self, track_list, x_len, bitrate=16, twos_comp=True, classes=256, store_tracks=False, encoder=None):
         self.data = []
         self.tracks = []
         self.x_len = x_len
-        self.y_len = y_len
+        self.y_len = 1
+        self.n_channels = 1
+        self.n_classes = 256
         self.bitrate = bitrate
         self.twos_comp = twos_comp
+
+        if encoder is None:
+            self.encoder = MuEncoder((0, 2**bitrate - 1))
+
         for track in track_list:
-            audio, sample_rate = self.__load_audio_from_wav(track)
+            audio, dtype, sample_rate = self.__load_audio_from_wav(track)
 
             if store_tracks:
                 self.tracks.append({'name': track, 
                                     'audio': audio, 
                                     'sample_rate': sample_rate})
 
-            for i in range(0, len(audio) - x_len - y_len, x_len + y_len):
-                x, y = self.__extract_segment(audio, x_len, y_len, start_idx=i)
+            for i in range(0, len(audio) - x_len - 1, x_len + 1):
+                x, y = self.__extract_segment(audio, x_len, 1, start_idx=i)
+
+                # apply mu-law encoding
+                x = self.encoder.encode(x)
+                y = self.encoder.encode(y)
+
+                # set inputs to discrete values
+                x = self.quantize(x)
+                y = self.quantize(y, label=True)
+
                 self.data.append({'x': x, 'y': y})
+        self.dtype = dtype
         self.sample_rate = sample_rate
     
     def __load_audio_from_wav(self, filename):
@@ -38,6 +56,7 @@ class AudioData(Dataset):
         sample_rate, audio = wavfile.read(filename)
         assert(audio.dtype=='int16') # assume audio is int16 for now
         assert(sample_rate==44100) # assume sample_rate is 44100 for now
+        dtype = audio.dtype
 
         # combine channels
         audio = np.array(audio)
@@ -50,7 +69,7 @@ class AudioData(Dataset):
         offset = (not self.twos_comp)*max_code
         normed_audio = (audio - offset)/norm_factor
         
-        return normed_audio, sample_rate
+        return normed_audio, dtype, sample_rate
     
     def __extract_segment(self, audio, n_x, n_y, start_idx=None):
         n_samples = audio.shape[0]
@@ -72,6 +91,10 @@ class AudioData(Dataset):
         #return self.__extract_segment(self.tracks[idx], self.x_len, self.y_len)
         x = torch.tensor(self.data[idx]['x'], dtype=torch.float32)
         y = torch.tensor(self.data[idx]['y'], dtype=torch.float32)
+
+        if len(x.shape) < 2:
+            x = torch.unsqueeze(x, 0)
+
         return (x, y)
         
     def convert_to_wav(self, audio):
@@ -79,6 +102,17 @@ class AudioData(Dataset):
         offset = (not self.twos_comp)*1.0
         scaled_audio = (audio + offset)*norm_factor
         return scaled_audio
+
+    def quantize(self, x, label=False):
+        n_bins = self.n_classes
+        bins = np.linspace(-1, 1, 256)
+        out = np.digitize(x, bins, right=False) - 1
+
+        if not label:
+            out = bins[out]
+
+        return out
+
 
 class AudioBatchSampler(BatchSampler):
     def __init__(self, dataset, batch_size, drop_last=True):

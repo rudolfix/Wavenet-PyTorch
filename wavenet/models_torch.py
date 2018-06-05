@@ -1,8 +1,10 @@
 import time, copy
+from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
+
 import torch
-from torch.nn import Module, Conv1d, Softmax
+from torch.nn import Module, Conv1d, Softmax, Sequential
 
 class Model(Module):
     def __init__(self, 
@@ -22,7 +24,7 @@ class Model(Module):
         self.num_hidden = num_hidden
         self.kernel_size = kernel_size
 
-        self.hs = []
+        hs = OrderedDict()
         first = True
         for b in range(num_blocks):
             for i in range(num_layers):
@@ -33,14 +35,15 @@ class Model(Module):
                     first = False
                 else:
                     h = Conv1d(num_hidden, num_hidden, kernel_size, dilation=rate)
-                self.hs.append(h) 
+                hs[name] = h
 
-        self.h_class = Conv1d(num_hidden, num_classes, kernel_size)
+        self.hs = Sequential(hs)
+        self.h_class = Conv1d(num_hidden, num_classes, 1)
 
     def forward(self, x):
-        for h in self.hs:
-            x = h(x)
-
+        # for h in self.hs:
+        #     x = h(x)
+        x = self.hs(x)
         x = self.h_class(x)
         return x
 
@@ -76,8 +79,8 @@ class Model(Module):
             running_corrects = 0
             
             for inputs, labels in dataloader:
-                inputs = torch.unsqueeze(inputs, 0).to(device)
-                labels = torch.unsqueeze(labels, 0).to(device)
+                inputs = inputs.to(device)
+                labels = labels.to(device)
                 
                 self.optimizer.zero_grad()
                 
