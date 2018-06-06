@@ -16,17 +16,17 @@ from .muencoder import MuEncoder
 
 class AudioData(Dataset):
     def __init__(self, track_list, x_len, bitrate=16, twos_comp=True, 
-                 n_classes=256, store_tracks=False, encoder=None):
+                 num_classes=256, store_tracks=False, encoder=None):
         self.data = []
         self.tracks = []
         self.x_len = x_len
         self.y_len = 1
-        self.n_channels = 1
-        self.n_classes = n_classes
+        self.num_channels = 1
+        self.num_classes = num_classes
         self.bitrate = bitrate
         self.datarange = (-2**(bitrate - 1), 2**(bitrate - 1) - 1)
         self.twos_comp = twos_comp
-        self.bins = np.linspace(-1, 1, n_classes)
+        self.bins = np.linspace(-1, 1, num_classes)
 
         if encoder is None:
             self.encoder = MuEncoder(self.datarange)
@@ -58,8 +58,8 @@ class AudioData(Dataset):
     def __load_audio_from_wav(self, filename):
         # read audio
         sample_rate, audio = wavfile.read(filename)
-        assert(audio.dtype=='int16') # assume audio is int16 for now
-        assert(sample_rate==44100) # assume sample_rate is 44100 for now
+        assert(audio.dtype == 'int16') # assume audio is int16 for now
+        assert(sample_rate == 44100) # assume sample_rate is 44100 for now
         dtype = audio.dtype
 
         # combine channels
@@ -69,17 +69,17 @@ class AudioData(Dataset):
 
         return audio, dtype, sample_rate
     
-    def __extract_segment(self, audio, n_x, n_y, start_idx=None):
-        n_samples = audio.shape[0]
-        n_points = n_x + n_y
+    def __extract_segment(self, audio, x_len, y_len, start_idx=None):
+        num_samples = audio.shape[0]
+        num_points = x_len + y_len
         
         if start_idx is None:
-            #   select random index from range(0, n_samples - n_points)
-            start_idx = np.random.randint(0, n_samples - n_points, 1)[0]
+            #   select random index from range(0, num_samples - num_points)
+            start_idx = np.random.randint(0, num_samples - num_points, 1)[0]
         
         # extract segment
-        x = audio[start_idx:start_idx+n_x]
-        y = audio[start_idx+n_x:start_idx+n_x+n_y]
+        x = audio[start_idx:start_idx + x_len]
+        y = audio[start_idx + x_len:start_idx + x_len + y_len]
         return x, y
         
     def __len__(self):
@@ -96,9 +96,9 @@ class AudioData(Dataset):
         return (x, y)
         
     def convert_to_wav(self, audio):
-        norm_factor = 2**self.bitrate/2.0
-        offset = (not self.twos_comp)*1.0
-        scaled_audio = (audio + offset)*norm_factor
+        norm_factor = 2**self.bitrate / 2.0
+        offset = (not self.twos_comp) * 1.0
+        scaled_audio = (audio + offset) * norm_factor
         return scaled_audio
 
     def quantize(self, x, label=False):

@@ -23,7 +23,8 @@ class Model(Module):
         self.num_layers = num_layers
         self.num_hidden = num_hidden
         self.kernel_size = kernel_size
-        self.device = self.set_device()
+        
+        self.set_device()
 
         hs = OrderedDict()
         first = True
@@ -108,5 +109,5 @@ class Generator(object):
     def predict(self, x):
         pass
 
-    def generate(self, x, len_sequence=None):
+    def run(self, x, num_samples):
         pass
