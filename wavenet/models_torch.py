@@ -23,6 +23,7 @@ class Model(Module):
         self.num_layers = num_layers
         self.num_hidden = num_hidden
         self.kernel_size = kernel_size
+        self.device = self.set_device()
 
         hs = OrderedDict()
         first = True
@@ -43,15 +44,19 @@ class Model(Module):
     def forward(self, x):
         return self.h_class(self.hs(x))
 
-    def train(self, dataloader, device=None, num_epochs=25, validation=False):
+    def set_device(self, device=None):
+        if device is None:
+            self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = device
+
+    def train(self, dataloader, num_epochs=25, validation=False):
         since = time.time()
         
         best_model_wts = copy.deepcopy(self.state_dict())
         best_acc = 0.0
         
-        if device is None:
-            device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.to(device)
+        self.to(self.device)
 
         if validation:
             phase = 'Validation'
@@ -75,8 +80,8 @@ class Model(Module):
             running_corrects = 0
             
             for inputs, labels in dataloader:
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+                inputs = inputs.to(self.device)
+                labels = labels.to(self.device)
                 
                 self.optimizer.zero_grad()
                 
