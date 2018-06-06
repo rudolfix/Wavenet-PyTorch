@@ -15,16 +15,18 @@ from torch.utils.data.sampler import RandomSampler, BatchSampler
 from .muencoder import MuEncoder
 
 class AudioData(Dataset):
-    def __init__(self, track_list, x_len, bitrate=16, twos_comp=True, classes=256, store_tracks=False, encoder=None):
+    def __init__(self, track_list, x_len, bitrate=16, twos_comp=True, 
+                 n_classes=256, store_tracks=False, encoder=None):
         self.data = []
         self.tracks = []
         self.x_len = x_len
         self.y_len = 1
         self.n_channels = 1
-        self.n_classes = 256
+        self.n_classes = n_classes
         self.bitrate = bitrate
         self.datarange = (-2**(bitrate - 1), 2**(bitrate - 1) - 1)
         self.twos_comp = twos_comp
+        self.bins = np.linspace(-1, 1, n_classes)
 
         if encoder is None:
             self.encoder = MuEncoder(self.datarange)
@@ -100,8 +102,7 @@ class AudioData(Dataset):
         return scaled_audio
 
     def quantize(self, x, label=False):
-        bins = np.linspace(-1, 1, self.n_classes)
-        out = np.digitize(x, bins, right=False) - 1
+        out = np.digitize(x, self.bins, right=False) - 1
 
         if not label:
             out = bins[out]
@@ -109,7 +110,7 @@ class AudioData(Dataset):
         return out
 
     def label2value(self, label):
-        return np.linspace(-1, 1, self.n_classes)[label.data.numpy().astype(int)]
+        return self.bins[label.data.numpy().astype(int)]
 
 
 class AudioBatchSampler(BatchSampler):
