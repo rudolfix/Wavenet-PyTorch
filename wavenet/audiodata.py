@@ -105,7 +105,7 @@ class AudioData(Dataset):
         out = np.digitize(x, self.bins, right=False) - 1
 
         if not label:
-            out = bins[out]
+            out = self.bins[out]
 
         return out
 
