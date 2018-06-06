@@ -86,7 +86,7 @@ class AudioData(Dataset):
     def __getitem__(self, idx):
         #return self.__extract_segment(self.tracks[idx], self.x_len, self.y_len)
         x = torch.tensor(self.data[idx]['x'], dtype=torch.float32)
-        y = torch.tensor(self.data[idx]['y'], dtype=torch.float32)
+        y = torch.tensor(self.data[idx]['y'], dtype=torch.long)
 
         if len(x.shape) < 2:
             x = torch.unsqueeze(x, 0)

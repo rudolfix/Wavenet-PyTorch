@@ -38,7 +38,7 @@ class Model(Module):
                 hs[name] = h
 
         self.hs = Sequential(hs)
-        self.h_class = Conv1d(num_hidden, num_classes, 1)
+        self.h_class = Conv1d(num_hidden, num_classes, 2)
 
     def forward(self, x):
         return self.h_class(self.hs(x))

@@ -9,11 +9,11 @@ filelist = ['assets/classical.wav']
 
 def set_args():
     parser = ArgumentParser(description='Wavenet demo')
-    parser.add_argument('--x_len', type=int, default=2**10, help='length of input')
+    parser.add_argument('--x_len', type=int, default=2**15, help='length of input')
     parser.add_argument('--num_classes', type=int, default=256, help='number of discrete output levels')
-    parser.add_argument('--num_layers', type=int, default=9, help='number of convolutional layers per block')
+    parser.add_argument('--num_layers', type=int, default=14, help='number of convolutional layers per block')
     parser.add_argument('--num_blocks', type=int, default=2, help='number of repeating convolutional layer blocks')
-    parser.add_argument('--num_hidden', type=int, default=64, help='number of neurons per layer')
+    parser.add_argument('--num_hidden', type=int, default=128, help='number of neurons per layer')
     parser.add_argument('--kernel_size', type=int, default=2, help='width of convolutional kernel')
     parser.add_argument('--learn_rate', type=float, default=0.001, help='learning rate')
     parser.add_argument('--step_size', type=int, default=50, help='step size of learning rate scheduler')
