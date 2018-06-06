@@ -100,3 +100,13 @@ class Model(Module):
             epoch_loss = running_loss / len(dataloader)
             print('{} Loss: {:.4f}'.format(phase, epoch_loss))
             print()
+
+class Generator(object):
+    def __init__(self, model):
+        self.model = model
+
+    def predict(self, x):
+        pass
+
+    def generate(self, x, len_sequence=None):
+        pass
