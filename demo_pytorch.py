@@ -1,3 +1,4 @@
+import os
 from argparse import ArgumentParser
 from torch import nn, optim
 
@@ -20,13 +21,14 @@ def set_args():
     parser.add_argument('--gamma', type=float, default=0.5, help='gamma of learning rate scheduler')
     parser.add_argument('--batch_size', type=int, default=8, help='batch size')
     parser.add_argument('--num_workers', type=int, default=1, help='number of workers')
+    parser.add_argument('--model_file', type=str, default='model.pt', help='filename of model')
 
     args = parser.parse_args()
     return args
 
 if __name__ == '__main__':
     args = set_args()
-    dataset = AudioData(filelist, args.x_len, classes=args.num_classes, 
+    dataset = AudioData(filelist, args.x_len, num_classes=args.num_classes, 
                         store_tracks=True)
     dataloader = AudioLoader(dataset, batch_size=args.batch_size, 
                              num_workers=args.num_workers)
@@ -34,12 +36,20 @@ if __name__ == '__main__':
     wave_model = Model(args.x_len, num_channels=1, num_classes=args.num_classes, 
                        num_blocks=args.num_blocks, num_layers=args.num_layers,
                        num_hidden=args.num_hidden, kernel_size=args.kernel_size)
+    if os.path.isfile(args.model_file):
+        print('Loading model data from file: {}'.format(args.model_file))
+        wave_model.load_state_dict(torch.load(args.model_file))
+    else:
+        print('Model data not found: {}'.format(args.model_file))
+        print('Training new model.')
+        wave_model.criterion = nn.CrossEntropyLoss()
+        wave_model.optimizer = optim.Adam(wave_model.parameters(), 
+                                          lr=args.learn_rate)
+        wave_model.scheduler = optim.lr_scheduler.StepLR(wave_model.optimizer, 
+                                                         step_size=args.step_size, 
+                                                         gamma=args.gamma)
 
-    wave_model.criterion = nn.CrossEntropyLoss()
-    wave_model.optimizer = optim.Adam(wave_model.parameters(), 
-                                      lr=args.learn_rate)
-    wave_model.scheduler = optim.lr_scheduler.StepLR(wave_model.optimizer, 
-                                                     step_size=args.step_size, 
-                                                     gamma=args.gamma)
+        wave_model.train(dataloader)
 
-    wave_model.train(dataloader)
+        print('Saving model data to file: {}'.format(args.model_file))
+        wave_model.save_state_dict(args.model_file)

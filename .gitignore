@@ -91,4 +91,5 @@ ENV/
 
 # PyTorch Wavenet
 *.swp
+*.pt
 todo.txt

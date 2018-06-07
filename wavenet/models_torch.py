@@ -54,9 +54,6 @@ class Model(Module):
     def train(self, dataloader, num_epochs=25, validation=False):
         since = time.time()
         
-        best_model_wts = copy.deepcopy(self.state_dict())
-        best_acc = 0.0
-        
         self.to(self.device)
 
         if validation:
@@ -64,7 +61,6 @@ class Model(Module):
         else:
             phase = 'Training'
 
-        retain = True
         for epoch in range(num_epochs):
             # display epoch
             print('Epoch {} / {}'.format(epoch, num_epochs - 1))
