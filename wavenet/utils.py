@@ -38,6 +38,7 @@ def set_args():
     parser.add_argument('--gamma', type=float, default=0.5, help='gamma of learning rate scheduler')
     parser.add_argument('--batch_size', type=int, default=8, help='batch size')
     parser.add_argument('--num_workers', type=int, default=1, help='number of workers')
+    parser.add_argument('--num_epochs', type=int, default=25, help='number of training epochs')
     parser.add_argument('--model_file', type=str, default='model.pt', help='filename of model')
 
     args = parser.parse_args()

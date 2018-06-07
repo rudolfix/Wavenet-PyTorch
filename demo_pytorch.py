@@ -35,7 +35,7 @@ if __name__ == '__main__':
                                                          step_size=args.step_size, 
                                                          gamma=args.gamma)
 
-        wave_model.train(dataloader, disp_interval=1)
+        wave_model.train(dataloader, num_epochs=args.num_epochs, disp_interval=1)
 
         print('Saving model data to file: {}'.format(args.model_file))
         torch.save(wave_model.state_dict(), args.model_file)
