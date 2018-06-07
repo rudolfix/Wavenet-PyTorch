@@ -1,4 +1,5 @@
 import os
+import torch
 from torch import nn, optim
 
 from wavenet.audiodata import AudioData, AudioLoader
@@ -37,9 +38,14 @@ if __name__ == '__main__':
         wave_model.train(dataloader)
 
         print('Saving model data to file: {}'.format(args.model_file))
-        wave_model.save_state_dict(args.model_file)
+        torch.save(wave_model.state_dict(), args.model_file)
 
     # predict sequence with model
     wave_generator = Generator(wave_model)
-    seq = dataset.preprocess(dataset.tracks[0][:args.x_len])
-    y = wave_generator.predict(seq)
+    seq = dataset._to_tensor(dataset.preprocess(dataset.tracks[0]['audio'][:args.x_len]))
+    # add batch dimension
+    seq = torch.unsqueeze(seq, 0)
+    y = dataset.label2value(wave_generator.predict(seq).argmax(dim=1))
+    print(y.shape)
+    print(y)
+    print('Decoded value: {}'.format(dataset.encoder.decode(y)))
