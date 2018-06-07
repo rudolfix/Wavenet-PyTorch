@@ -35,13 +35,13 @@ if __name__ == '__main__':
                                                          step_size=args.step_size, 
                                                          gamma=args.gamma)
 
-        wave_model.train(dataloader)
+        wave_model.train(dataloader, disp_interval=1)
 
         print('Saving model data to file: {}'.format(args.model_file))
         torch.save(wave_model.state_dict(), args.model_file)
 
     # predict sequence with model
     wave_generator = Generator(wave_model, dataset)
-    y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], 30)
+    y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], 10)
     print(y)
     print(y.shape)

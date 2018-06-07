@@ -51,7 +51,7 @@ class Model(Module):
         else:
             self.device = device
 
-    def train(self, dataloader, num_epochs=25, validation=False):
+    def train(self, dataloader, num_epochs=25, validation=False, disp_interval=None):
         since = time.time()
         
         self.to(self.device)
@@ -62,9 +62,9 @@ class Model(Module):
             phase = 'Training'
 
         for epoch in range(num_epochs):
-            # display epoch
-            print('Epoch {} / {}'.format(epoch, num_epochs - 1))
-            print('-' * 10)
+            if disp_interval is not None and epoch % disp_interval == 0:
+                print('Epoch {} / {}'.format(epoch, num_epochs - 1))
+                print('-' * 10)
             
             if not validation:
                 self.scheduler.step()
@@ -94,9 +94,11 @@ class Model(Module):
                         
                 running_loss += loss.item() * inputs.size(1)
                 
-            epoch_loss = running_loss / len(dataloader)
-            print('{} Loss: {:.4f}'.format(phase, epoch_loss))
-            print()
+
+            if disp_interval is not None and epoch % disp_interval == 0:
+                epoch_loss = running_loss / len(dataloader)
+                print('{} Loss: {:.4f}'.format(phase, epoch_loss))
+                print()
 
 class Generator(object):
     def __init__(self, model, dataset):
@@ -123,7 +125,7 @@ class Generator(object):
         for i in range(num_samples):
             if disp_interval is not None and i % disp_interval == 0:
                 print('Sample {} / {}'.format(i, num_samples))
-                
+
             y_i = self._predict_val(x)
             y_decoded = self.dataset.encoder.decode(y_i)
             out[i] = y_decoded
