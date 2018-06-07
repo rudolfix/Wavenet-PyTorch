@@ -115,7 +115,8 @@ class Generator(object):
         return self.dataset.label2value(y.argmax(dim=1))[0]
 
     def predict(self, x):
-        return self.model(x)
+        x = x.to(self.model.device)
+        return self.model(x).cpu()
 
     def run(self, x, num_samples, disp_interval=None):
         x = self.dataset._to_tensor(self.dataset.preprocess(x))
