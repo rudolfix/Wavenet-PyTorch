@@ -73,19 +73,25 @@ class AudioData(Dataset):
         x = audio[start_idx:start_idx + x_len]
         y = audio[start_idx + x_len:start_idx + x_len + y_len]
         return x, y
+
+    def _to_tensor(self, x, y=None):
+        x = torch.tensor(x, dtype=torch.float32)
+        if len(x.shape) < 2:
+            x = torch.unsqueeze(x, 0)
+
+        if y is not None:
+            y = torch.tensor(y, dtype=torch.long)
+            out = (x, y)
+        else:
+            out = x
+
+        return out
         
     def __len__(self):
         return len(self.data)
         
     def __getitem__(self, idx):
-        #return self.__extract_segment(self.tracks[idx], self.x_len, self.y_len)
-        x = torch.tensor(self.data[idx]['x'], dtype=torch.float32)
-        y = torch.tensor(self.data[idx]['y'], dtype=torch.long)
-
-        if len(x.shape) < 2:
-            x = torch.unsqueeze(x, 0)
-
-        return (x, y)
+        return self._to_tensor(self.data[idx]['x'], self.data[idx]['y'])
         
     def convert_to_wav(self, audio):
         norm_factor = 2**self.bitrate / 2.0
