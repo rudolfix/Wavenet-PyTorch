@@ -115,12 +115,15 @@ class Generator(object):
     def predict(self, x):
         return self.model(x)
 
-    def run(self, x, num_samples):
+    def run(self, x, num_samples, disp_interval=None):
         x = self.dataset._to_tensor(self.dataset.preprocess(x))
         x = torch.unsqueeze(x, 0)
 
         out = np.zeros(num_samples)
         for i in range(num_samples):
+            if disp_interval is not None and i % disp_interval == 0:
+                print('Sample {} / {}'.format(i, num_samples))
+                
             y_i = self._predict_val(x)
             y_decoded = self.dataset.encoder.decode(y_i)
             out[i] = y_decoded
