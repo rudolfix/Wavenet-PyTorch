@@ -62,10 +62,6 @@ class Model(Module):
             phase = 'Training'
 
         for epoch in range(num_epochs):
-            if disp_interval is not None and epoch % disp_interval == 0:
-                print('Epoch {} / {}'.format(epoch, num_epochs - 1))
-                print('-' * 10)
-            
             if not validation:
                 self.scheduler.step()
                 super().train()
@@ -97,7 +93,10 @@ class Model(Module):
 
             if disp_interval is not None and epoch % disp_interval == 0:
                 epoch_loss = running_loss / len(dataloader)
+                print('Epoch {} / {}'.format(epoch, num_epochs - 1))
+                print('Learning Rate: {}'.format(self.scheduler.get_lr()))
                 print('{} Loss: {:.4f}'.format(phase, epoch_loss))
+                print('-' * 10)
                 print()
 
 class Generator(object):
