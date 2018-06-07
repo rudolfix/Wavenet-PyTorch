@@ -41,11 +41,7 @@ if __name__ == '__main__':
         torch.save(wave_model.state_dict(), args.model_file)
 
     # predict sequence with model
-    wave_generator = Generator(wave_model)
-    seq = dataset._to_tensor(dataset.preprocess(dataset.tracks[0]['audio'][:args.x_len]))
-    # add batch dimension
-    seq = torch.unsqueeze(seq, 0)
-    y = dataset.label2value(wave_generator.predict(seq).argmax(dim=1))
-    print(y.shape)
+    wave_generator = Generator(wave_model, dataset)
+    y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], 30)
     print(y)
-    print('Decoded value: {}'.format(dataset.encoder.decode(y)))
+    print(y.shape)

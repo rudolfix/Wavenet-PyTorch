@@ -99,11 +99,33 @@ class Model(Module):
             print()
 
 class Generator(object):
-    def __init__(self, model):
+    def __init__(self, model, dataset):
         self.model = model
+        self.dataset = dataset
+
+    def _shift_insert(self, x, val):
+        x = x.narrow(-1, 1, x.shape[-1] - 1)
+        val = val.reshape([1] * len(x.shape))
+        return torch.cat([x, self.dataset._to_tensor(val)], -1)
+
+    def _predict_val(self, x):
+        y = self.predict(x)
+        return self.dataset.label2value(y.argmax(dim=1))[0]
 
     def predict(self, x):
         return self.model(x)
 
     def run(self, x, num_samples):
-        pass
+        x = self.dataset._to_tensor(self.dataset.preprocess(x))
+        x = torch.unsqueeze(x, 0)
+
+        out = np.zeros(num_samples)
+        for i in range(num_samples):
+            y_i = self._predict_val(x)
+            y_decoded = self.dataset.encoder.decode(y_i)
+            out[i] = y_decoded
+
+            # shift sequence and insert generated value
+            x = self._shift_insert(x, y_i)
+
+        return out
