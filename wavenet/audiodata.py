@@ -41,15 +41,7 @@ class AudioData(Dataset):
 
             for i in range(0, len(audio) - x_len - 1, x_len + 1):
                 x, y = self.__extract_segment(audio, x_len, 1, start_idx=i)
-
-                # apply mu-law encoding
-                x = self.encoder.encode(x)
-                y = self.encoder.encode(y)
-
-                # set inputs to discrete values
-                x = self.quantize(x)
-                y = self.quantize(y, label=True)
-
+                x, y = self.preprocess(x, y)
                 self.data.append({'x': x, 'y': y})
 
         self.dtype = dtype
@@ -111,6 +103,19 @@ class AudioData(Dataset):
 
     def label2value(self, label):
         return self.bins[label.data.numpy().astype(int)]
+
+    def preprocess(self, x, y=None):
+        x = self.encoder.encode(x)
+        x = self.quantize(x)
+
+        if y is not None:
+            y = self.encoder.encode(y)
+            y = self.quantize(y, label=True)
+            out = (x, y)
+        else:
+            out = x
+
+        return out
 
 
 class AudioBatchSampler(BatchSampler):

@@ -103,7 +103,7 @@ class Generator(object):
         self.model = model
 
     def predict(self, x):
-        pass
+        return self.model(x)
 
     def run(self, x, num_samples):
         pass
