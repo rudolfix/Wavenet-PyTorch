@@ -109,10 +109,6 @@ class Generator(object):
         val = val.reshape([1] * len(x.shape))
         return torch.cat([x, self.dataset._to_tensor(val)], -1)
 
-    def _predict_val(self, x):
-        y = self.predict(x)
-        return self.dataset.label2value(y.argmax(dim=1))[0]
-
     def predict(self, x):
         x = x.to(self.model.device)
         self.model.to(self.model.device)
@@ -127,7 +123,8 @@ class Generator(object):
             if disp_interval is not None and i % disp_interval == 0:
                 print('Sample {} / {}'.format(i, num_samples))
 
-            y_i = self._predict_val(x)
+            y_i = self.predict(x).cpu()
+            y_i = self.dataset.label2value(y_i.argmax(dim=1))[0]
             y_decoded = self.dataset.encoder.decode(y_i)
             out[i] = y_decoded
 
