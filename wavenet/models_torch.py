@@ -115,7 +115,8 @@ class Generator(object):
 
     def predict(self, x):
         x = x.to(self.model.device)
-        return self.model(x).cpu()
+        self.model.to(self.model.device)
+        return self.model(x)
 
     def run(self, x, num_samples, disp_interval=None):
         x = self.dataset._to_tensor(self.dataset.preprocess(x))
