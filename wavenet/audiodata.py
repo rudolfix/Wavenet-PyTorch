@@ -47,6 +47,12 @@ class AudioData(Dataset):
         self.dtype = dtype
         self.sample_rate = sample_rate
     
+    def __len__(self):
+        return len(self.data)
+        
+    def __getitem__(self, idx):
+        return self._to_tensor(self.data[idx]['x'], self.data[idx]['y'])
+        
     def _load_audio_from_wav(self, filename):
         # read audio
         sample_rate, audio = wavfile.read(filename)
@@ -86,18 +92,6 @@ class AudioData(Dataset):
             out = x
 
         return out
-        
-    def __len__(self):
-        return len(self.data)
-        
-    def __getitem__(self, idx):
-        return self._to_tensor(self.data[idx]['x'], self.data[idx]['y'])
-        
-    def convert_to_wav(self, audio):
-        norm_factor = 2**self.bitrate / 2.0
-        offset = (not self.twos_comp) * 1.0
-        scaled_audio = (audio + offset) * norm_factor
-        return scaled_audio
 
     def _quantize(self, x, label=False):
         out = np.digitize(x, self.bins, right=False) - 1
@@ -106,6 +100,16 @@ class AudioData(Dataset):
             out = self.bins[out]
 
         return out
+        
+    def save_wav(self, filename, data, sample_rate=None, dtype=None):
+        if sample_rate is None:
+            sample_rate = self.sample_rate
+
+        if dtype is None:
+            dtype = self.dtype
+
+        data = data.astype(dtype)
+        return wavfile.write(filename, self.sample_rate, data)
 
     def label2value(self, label):
         return self.bins[label.astype(int)]

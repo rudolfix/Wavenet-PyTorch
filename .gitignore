@@ -93,3 +93,4 @@ ENV/
 *.swp
 *.pt
 todo.txt
+assets/tmp.wav
