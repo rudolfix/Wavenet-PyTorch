@@ -32,7 +32,7 @@ class AudioData(Dataset):
             self.encoder = MuEncoder(self.datarange)
 
         for track in track_list:
-            audio, dtype, sample_rate = self.__load_audio_from_wav(track)
+            audio, dtype, sample_rate = self._load_audio_from_wav(track)
 
             if store_tracks:
                 self.tracks.append({'name': track, 
@@ -40,14 +40,14 @@ class AudioData(Dataset):
                                     'sample_rate': sample_rate})
 
             for i in range(0, len(audio) - x_len - 1, x_len + 1):
-                x, y = self.__extract_segment(audio, x_len, 1, start_idx=i)
+                x, y = self._extract_segment(audio, x_len, 1, start_idx=i)
                 x, y = self.preprocess(x, y)
                 self.data.append({'x': x, 'y': y})
 
         self.dtype = dtype
         self.sample_rate = sample_rate
     
-    def __load_audio_from_wav(self, filename):
+    def _load_audio_from_wav(self, filename):
         # read audio
         sample_rate, audio = wavfile.read(filename)
         assert(audio.dtype == 'int16') # assume audio is int16 for now
@@ -61,7 +61,7 @@ class AudioData(Dataset):
 
         return audio, dtype, sample_rate
     
-    def __extract_segment(self, audio, x_len, y_len, start_idx=None):
+    def _extract_segment(self, audio, x_len, y_len, start_idx=None):
         num_samples = audio.shape[0]
         num_points = x_len + y_len
         
@@ -99,7 +99,7 @@ class AudioData(Dataset):
         scaled_audio = (audio + offset) * norm_factor
         return scaled_audio
 
-    def quantize(self, x, label=False):
+    def _quantize(self, x, label=False):
         out = np.digitize(x, self.bins, right=False) - 1
 
         if not label:
@@ -108,15 +108,15 @@ class AudioData(Dataset):
         return out
 
     def label2value(self, label):
-        return self.bins[label.data.numpy().astype(int)]
+        return self.bins[label.astype(int)]
 
     def preprocess(self, x, y=None):
         x = self.encoder.encode(x)
-        x = self.quantize(x)
+        x = self._quantize(x)
 
         if y is not None:
             y = self.encoder.encode(y)
-            y = self.quantize(y, label=True)
+            y = self._quantize(y, label=True)
             out = (x, y)
         else:
             out = x

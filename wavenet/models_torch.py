@@ -95,7 +95,7 @@ class Model(Module):
                 epoch_loss = running_loss / len(dataloader)
                 print('Epoch {} / {}'.format(epoch, num_epochs - 1))
                 print('Learning Rate: {}'.format(self.scheduler.get_lr()))
-                print('{} Loss: {:.4f}'.format(phase, epoch_loss))
+                print('{} Loss: {}'.format(phase, epoch_loss))
                 print('-' * 10)
                 print()
 
@@ -108,6 +108,9 @@ class Generator(object):
         x = x.narrow(-1, 1, x.shape[-1] - 1)
         val = val.reshape([1] * len(x.shape))
         return torch.cat([x, self.dataset._to_tensor(val)], -1)
+
+    def tensor2numpy(self, x):
+        return x.data.numpy()
 
     def predict(self, x):
         x = x.to(self.model.device)
@@ -123,8 +126,8 @@ class Generator(object):
             if disp_interval is not None and i % disp_interval == 0:
                 print('Sample {} / {}'.format(i, num_samples))
 
-            y_i = self.predict(x).cpu()
-            y_i = self.dataset.label2value(y_i.argmax(dim=1))[0]
+            y_i = self.tensor2numpy(self.predict(x).cpu())
+            y_i = self.dataset.label2value(y_i.argmax(axis=1))[0]
             y_decoded = self.dataset.encoder.decode(y_i)
             out[i] = y_decoded
 
