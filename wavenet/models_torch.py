@@ -4,9 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
-from torch.nn import Module, Conv1d, Softmax, Sequential
+import torch.nn as nn
+import torch.nn.functional as F
 
-class Model(Module):
+class Model(nn.Module):
     def __init__(self, 
                  num_time_samples,
                  num_channels=1,
@@ -33,14 +34,17 @@ class Model(Module):
                 rate = 2**i
                 name = 'b{}-l{}'.format(b, i)
                 if first:
-                    h = Conv1d(num_channels, num_hidden, kernel_size, dilation=rate)
+                    h = GatedConv1d(num_channels, num_hidden, kernel_size, dilation=rate)
                     first = False
                 else:
-                    h = Conv1d(num_hidden, num_hidden, kernel_size, dilation=rate)
-                hs[name] = h
+                    h = GatedConv1d(num_hidden, num_hidden, kernel_size, dilation=rate)
 
-        self.hs = Sequential(hs)
-        self.h_class = Conv1d(num_hidden, num_classes, 2)
+                hs[name] = h
+                hs[name + '-bn'] = nn.BatchNorm1d(num_hidden)
+                # hs[name + '-relu'] = nn.ReLU()
+
+        self.hs = nn.Sequential(hs)
+        self.h_class = nn.Conv1d(num_hidden, num_classes, 2)
 
     def forward(self, x):
         return self.h_class(self.hs(x))
@@ -81,7 +85,6 @@ class Model(Module):
                 # track history only during training phase
                 with torch.set_grad_enabled(not validation):
                     outputs = self(inputs)
-                    
                     loss = self.criterion(outputs, labels)
                     
                     if not validation:
@@ -89,7 +92,6 @@ class Model(Module):
                         self.optimizer.step()
                         
                 running_loss += loss.item() * inputs.size(1)
-                
 
             if disp_interval is not None and epoch % disp_interval == 0:
                 epoch_loss = running_loss / len(dataloader)
@@ -98,6 +100,20 @@ class Model(Module):
                 print('{} Loss: {}'.format(phase, epoch_loss))
                 print('-' * 10)
                 print()
+
+class GatedConv1d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, 
+                 dilation=1, groups=1, bias=True):
+        super(GatedConv1d, self).__init__()
+        conv_f = Conv1d(in_channels, out_channels, kernel_size, stride=stride, 
+                        padding=padding, dilation=dilation, groups=groups, 
+                        bias=bias)
+        conv_g = Conv1d(in_channels, out_channels, kernel_size, stride=stride, 
+                        padding=padding, dilation=dilation, groups=groups, 
+                        bias=bias)
+
+    def forward(self, x):
+        return torch.mul(nn.Tanh(conv_f(x)), nn.Sigmoid(conv_g(x)))
 
 class Generator(object):
     def __init__(self, model, dataset):

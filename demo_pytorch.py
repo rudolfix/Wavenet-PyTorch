@@ -62,6 +62,6 @@ if __name__ == '__main__':
 
     # predict sequence with model
     wave_generator = Generator(wave_model, dataset)
-    y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], args.new_seq_len)
-    print(y)
-    print(y.shape)
+    y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], 
+                           args.new_seq_len, disp_interval=100)
+    dataset.save_wav('assets/tmp.wav', y, 44100)
