@@ -4,10 +4,30 @@ from torch import nn, optim
 
 from wavenet.audiodata import AudioData, AudioLoader
 from wavenet.models_torch import Model, Generator
-from wavenet.utils import set_args
 
+from argparse import ArgumentParser
 
 filelist = ['assets/classical.wav']
+
+def set_args():
+    parser = ArgumentParser(description='Wavenet demo')
+    parser.add_argument('--x_len', type=int, default=2**15, help='length of input')
+    parser.add_argument('--num_classes', type=int, default=256, help='number of discrete output levels')
+    parser.add_argument('--num_layers', type=int, default=14, help='number of convolutional layers per block')
+    parser.add_argument('--num_blocks', type=int, default=2, help='number of repeating convolutional layer blocks')
+    parser.add_argument('--num_hidden', type=int, default=128, help='number of neurons per layer')
+    parser.add_argument('--kernel_size', type=int, default=2, help='width of convolutional kernel')
+    parser.add_argument('--learn_rate', type=float, default=0.001, help='learning rate')
+    parser.add_argument('--step_size', type=int, default=50, help='step size of learning rate scheduler')
+    parser.add_argument('--gamma', type=float, default=0.5, help='gamma of learning rate scheduler')
+    parser.add_argument('--batch_size', type=int, default=8, help='batch size')
+    parser.add_argument('--num_workers', type=int, default=1, help='number of workers')
+    parser.add_argument('--num_epochs', type=int, default=25, help='number of training epochs')
+    parser.add_argument('--model_file', type=str, default='model.pt', help='filename of model')
+    parser.add_argument('--new_seq_len', type=int, default=1000, help='length of sequence to predict')
+
+    args = parser.parse_args()
+    return args
 
 if __name__ == '__main__':
     args = set_args()
@@ -42,6 +62,6 @@ if __name__ == '__main__':
 
     # predict sequence with model
     wave_generator = Generator(wave_model, dataset)
-    y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], 10)
+    y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], args.new_seq_len)
     print(y)
     print(y.shape)
