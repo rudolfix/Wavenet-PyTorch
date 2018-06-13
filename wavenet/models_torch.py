@@ -16,7 +16,7 @@ class Model(nn.Module):
                  num_layers=14,
                  num_hidden=128,
                  kernel_size=2):
-        super().__init__()
+        super(Model, self).__init__()
         self.num_time_samples = num_time_samples
         self.num_channels = num_channels
         self.num_classes = num_classes
@@ -41,7 +41,6 @@ class Model(nn.Module):
 
                 hs[name] = h
                 hs[name + '-bn'] = nn.BatchNorm1d(num_hidden)
-                # hs[name + '-relu'] = nn.ReLU()
 
         self.hs = nn.Sequential(hs)
         self.h_class = nn.Conv1d(num_hidden, num_classes, 2)
@@ -105,15 +104,17 @@ class GatedConv1d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, 
                  dilation=1, groups=1, bias=True):
         super(GatedConv1d, self).__init__()
-        conv_f = Conv1d(in_channels, out_channels, kernel_size, stride=stride, 
-                        padding=padding, dilation=dilation, groups=groups, 
-                        bias=bias)
-        conv_g = Conv1d(in_channels, out_channels, kernel_size, stride=stride, 
-                        padding=padding, dilation=dilation, groups=groups, 
-                        bias=bias)
+        self.conv_f = nn.Conv1d(in_channels, out_channels, kernel_size, 
+                                stride=stride, padding=padding, dilation=dilation, 
+                                groups=groups, bias=bias)
+        self.conv_g = nn.Conv1d(in_channels, out_channels, kernel_size, 
+                                stride=stride, padding=padding, dilation=dilation, 
+                                groups=groups, bias=bias)
+        self.tanh = nn.Tanh()
+        self.sig = nn.Sigmoid()
 
     def forward(self, x):
-        return torch.mul(nn.Tanh(conv_f(x)), nn.Sigmoid(conv_g(x)))
+        return torch.mul(self.tanh(self.conv_f(x)), self.sig(self.conv_g(x)))
 
 class Generator(object):
     def __init__(self, model, dataset):
