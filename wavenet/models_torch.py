@@ -114,7 +114,8 @@ class GatedConv1d(nn.Module):
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
-        return torch.mul(self.tanh(self.conv_f(x)), self.sig(self.conv_g(x)))
+        # return torch.mul(self.tanh(self.conv_f(x)), self.sig(self.conv_g(x)))
+        return torch.mul(self.conv_f(x), self.sig(self.conv_g(x)))
 
 class Generator(object):
     def __init__(self, model, dataset):
