@@ -1,5 +1,6 @@
 import time, copy
 from collections import OrderedDict
+from functools import reduce
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -24,29 +25,51 @@ class Model(nn.Module):
         self.num_layers = num_layers
         self.num_hidden = num_hidden
         self.kernel_size = kernel_size
+        self.receptive_field = 1 + (kernel_size - 1) * \
+                               num_blocks * sum([2**k for k in range(num_layers)])
+        self.output_width = num_time_samples - self.receptive_field + 1
+        print('receptive_field: {}'.format(self.receptive_field))
+        print('Output width: {}'.format(self.output_width))
         
         self.set_device()
 
-        hs = OrderedDict()
+        hs = []
+        batch_norms = []
         first = True
         for b in range(num_blocks):
             for i in range(num_layers):
                 rate = 2**i
                 name = 'b{}-l{}'.format(b, i)
                 if first:
-                    h = GatedConv1d(num_channels, num_hidden, kernel_size, dilation=rate)
+                    h = GatedResidualBlock(num_channels, num_hidden, kernel_size, self.output_width,
+                                           dilation=rate)
                     first = False
                 else:
-                    h = GatedConv1d(num_hidden, num_hidden, kernel_size, dilation=rate)
+                    h = GatedResidualBlock(num_hidden, num_hidden, kernel_size, self.output_width,
+                                           dilation=rate)
 
-                hs[name] = h
-                hs[name + '-bn'] = nn.BatchNorm1d(num_hidden)
+                hs.append(h)
+                batch_norms.append(nn.BatchNorm1d(num_hidden))
 
-        self.hs = nn.Sequential(hs)
+        self.hs = nn.ModuleList(hs)
+        self.batch_norms = nn.ModuleList(batch_norms)
+        self.relu_1 = nn.ReLU()
+        self.conv_1_1 = nn.Conv1d(num_hidden, num_hidden, 1)
+        self.relu_2 = nn.ReLU()
+        self.conv_1_2 = nn.Conv1d(num_hidden, num_hidden, 1)
         self.h_class = nn.Conv1d(num_hidden, num_classes, 2)
 
     def forward(self, x):
-        return self.h_class(self.hs(x))
+        skips = []
+        for layer, batch_norm in zip(self.hs, self.batch_norms):
+            x, skip = layer(x)
+            x = batch_norm(x)
+            skips.append(skip)
+
+        x = reduce((lambda a, b : torch.add(a, b)), skips)
+        x = self.relu_1(self.conv_1_1(x))
+        x = self.relu_2(self.conv_1_2(x))
+        return self.h_class(x)
 
     def set_device(self, device=None):
         if device is None:
@@ -104,18 +127,38 @@ class GatedConv1d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, 
                  dilation=1, groups=1, bias=True):
         super(GatedConv1d, self).__init__()
+        self.dilation = dilation
         self.conv_f = nn.Conv1d(in_channels, out_channels, kernel_size, 
                                 stride=stride, padding=padding, dilation=dilation, 
                                 groups=groups, bias=bias)
         self.conv_g = nn.Conv1d(in_channels, out_channels, kernel_size, 
                                 stride=stride, padding=padding, dilation=dilation, 
                                 groups=groups, bias=bias)
-        self.tanh = nn.Tanh()
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
-        # return torch.mul(self.tanh(self.conv_f(x)), self.sig(self.conv_g(x)))
+        padding = self.dilation - (x.shape[-1] + self.dilation - 1) % self.dilation
+        x = nn.functional.pad(x, (0, self.dilation))
         return torch.mul(self.conv_f(x), self.sig(self.conv_g(x)))
+
+class GatedResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, output_width, stride=1, padding=0, 
+                 dilation=1, groups=1, bias=True):
+        super(GatedResidualBlock, self).__init__()
+        self.output_width = output_width
+        self.gatedconv = GatedConv1d(in_channels, out_channels, kernel_size, 
+                                     stride=stride, padding=padding, 
+                                     dilation=dilation, groups=groups, bias=bias)
+        self.conv_1 = nn.Conv1d(out_channels, out_channels, 1, stride=1, padding=0,
+                                dilation=1, groups=1, bias=bias)
+
+    def forward(self, x):
+        skip = self.conv_1(self.gatedconv(x))
+        residual = torch.add(skip, x)
+
+        skip_cut = skip.shape[-1] - self.output_width
+        skip = skip.narrow(-1, skip_cut, self.output_width)
+        return residual, skip
 
 class Generator(object):
     def __init__(self, model, dataset):
