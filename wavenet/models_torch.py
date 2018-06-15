@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import visdom
 
 class Model(nn.Module):
     def __init__(self, 
@@ -39,7 +40,6 @@ class Model(nn.Module):
         for b in range(num_blocks):
             for i in range(num_layers):
                 rate = 2**i
-                name = 'b{}-l{}'.format(b, i)
                 if first:
                     h = GatedResidualBlock(num_channels, num_hidden, kernel_size, self.output_width,
                                            dilation=rate)
@@ -47,6 +47,7 @@ class Model(nn.Module):
                 else:
                     h = GatedResidualBlock(num_hidden, num_hidden, kernel_size, self.output_width,
                                            dilation=rate)
+                h.name = 'b{}-l{}'.format(b, i)
 
                 hs.append(h)
                 batch_norms.append(nn.BatchNorm1d(num_hidden))
@@ -77,7 +78,7 @@ class Model(nn.Module):
         else:
             self.device = device
 
-    def train(self, dataloader, num_epochs=25, validation=False, disp_interval=None):
+    def train(self, dataloader, num_epochs=25, validation=False, disp_interval=None, use_visdom=False):
         since = time.time()
         
         self.to(self.device)
@@ -87,6 +88,12 @@ class Model(nn.Module):
         else:
             phase = 'Training'
 
+        if use_visdom:
+            vis = visdom.Visdom()
+        else:
+            vis = None
+
+        losses = []
         for epoch in range(num_epochs):
             if not validation:
                 self.scheduler.step()
@@ -115,6 +122,7 @@ class Model(nn.Module):
                         
                 running_loss += loss.item() * inputs.size(1)
 
+            losses.append(running_loss)
             if disp_interval is not None and epoch % disp_interval == 0:
                 epoch_loss = running_loss / len(dataloader)
                 print('Epoch {} / {}'.format(epoch, num_epochs - 1))
@@ -122,6 +130,34 @@ class Model(nn.Module):
                 print('{} Loss: {}'.format(phase, epoch_loss))
                 print('-' * 10)
                 print()
+
+                if vis is not None:
+                    # display network weights
+                    for m in self.hs:
+                        _vis_hist(vis, m.gatedconv.conv_f.weight, 
+                                  m.name + ' ' + 'W-conv_f')
+                        _vis_hist(vis, m.gatedconv.conv_g.weight, 
+                                  m.name + ' ' + 'W-conv_g')
+                        _vis_hist(vis, m.gatedconv.conv_f.bias,
+                                  m.name + ' ' + 'b-conv_f')
+                        _vis_hist(vis, m.gatedconv.conv_g.bias, 
+                                  m.name + ' ' + 'b-conv_g')
+
+                    # display raw outputs
+                    _vis_hist(vis, outputs, 'Outputs')
+
+                    # display loss over time
+                    losses = np.array(losses) / len(dataloader)
+                    _vis_plot(vis, losses, 'Losses')
+
+def _flatten(t):
+    return t.data.numpy().reshape([-1])
+
+def _vis_hist(vis, t, title):
+    vis.histogram(_flatten(t), win=title, opts={'title': title})
+
+def _vis_plot(vis, t, title):
+    vis.line(t, X=np.array(range(len(t))), win=title, opts={'title': title})
 
 class GatedConv1d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, 

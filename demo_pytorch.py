@@ -24,6 +24,7 @@ def set_args():
     parser.add_argument('--num_workers', type=int, default=1, help='number of workers')
     parser.add_argument('--num_epochs', type=int, default=25, help='number of training epochs')
     parser.add_argument('--model_file', type=str, default='model.pt', help='filename of model')
+    parser.add_argument('--visdom', type=bool, default=False, help='flag to track variables in visdom')
     parser.add_argument('--new_seq_len', type=int, default=1000, help='length of sequence to predict')
 
     args = parser.parse_args()
@@ -55,7 +56,7 @@ if __name__ == '__main__':
                                                          step_size=args.step_size, 
                                                          gamma=args.gamma)
 
-        wave_model.train(dataloader, num_epochs=args.num_epochs, disp_interval=1)
+        wave_model.train(dataloader, num_epochs=args.num_epochs, disp_interval=1, use_visdom=args.visdom)
 
         print('Saving model data to file: {}'.format(args.model_file))
         torch.save(wave_model.state_dict(), args.model_file)
