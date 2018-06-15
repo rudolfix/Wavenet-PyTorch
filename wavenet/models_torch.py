@@ -147,10 +147,10 @@ class Model(nn.Module):
                     _vis_hist(vis, outputs, 'Outputs')
 
                     # display loss over time
-                    losses = np.array(losses) / len(dataloader)
-                    _vis_plot(vis, losses, 'Losses')
+                    _vis_plot(vis, np.array(losses) / len(dataloader), 'Losses')
 
 def _flatten(t):
+    t = t.to(torch.device('cpu'))
     return t.data.numpy().reshape([-1])
 
 def _vis_hist(vis, t, title):
