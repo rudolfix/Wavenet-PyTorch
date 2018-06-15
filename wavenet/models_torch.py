@@ -138,7 +138,7 @@ class GatedConv1d(nn.Module):
 
     def forward(self, x):
         padding = self.dilation - (x.shape[-1] + self.dilation - 1) % self.dilation
-        x = nn.functional.pad(x, (0, self.dilation))
+        x = nn.functional.pad(x, (self.dilation, 0))
         return torch.mul(self.conv_f(x), self.sig(self.conv_g(x)))
 
 class GatedResidualBlock(nn.Module):
