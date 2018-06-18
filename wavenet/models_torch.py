@@ -97,7 +97,7 @@ class Model(nn.Module):
             vis = None
 
         losses = []
-        for epoch in range(num_epochs):
+        for epoch in range(1, num_epochs + 1):
             if not validation:
                 self.scheduler.step()
                 super().train()
@@ -128,7 +128,7 @@ class Model(nn.Module):
             losses.append(running_loss)
             if disp_interval is not None and epoch % disp_interval == 0:
                 epoch_loss = running_loss / len(dataloader)
-                print('Epoch {} / {}'.format(epoch, num_epochs - 1))
+                print('Epoch {} / {}'.format(epoch, num_epochs))
                 print('Learning Rate: {}'.format(self.scheduler.get_lr()))
                 print('{} Loss: {}'.format(phase, epoch_loss))
                 print('-' * 10)
