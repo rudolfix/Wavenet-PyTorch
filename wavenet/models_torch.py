@@ -90,6 +90,7 @@ class Model(nn.Module):
 
         if use_visdom:
             vis = visdom.Visdom()
+            gen = Generator(self, dataloader.dataset)
         else:
             vis = None
 
@@ -149,6 +150,11 @@ class Model(nn.Module):
                     # display loss over time
                     _vis_plot(vis, np.array(losses) / len(dataloader), 'Losses')
 
+                    # display audio sample
+                    _vis_audio(vis, gen, inputs[0], 'Sample Audio', n_samples=44100,
+                               sample_rate=dataloader.dataset.sample_rate)
+
+
 def _flatten(t):
     t = t.to(torch.device('cpu'))
     return t.data.numpy().reshape([-1])
@@ -158,6 +164,13 @@ def _vis_hist(vis, t, title):
 
 def _vis_plot(vis, t, title):
     vis.line(t, X=np.array(range(len(t))), win=title, opts={'title': title})
+
+def _vis_audio(vis, gen, t, title, n_samples=50, sample_rate=44100):
+    y = gen.run(t, n_samples).reshape([-1])
+    t = gen.dataset.encoder.decode(gen.tensor2numpy(t.cpu())).reshape([-1])
+    audio = np.concatenate((t, y))
+    vis.audio(audio, win=title, 
+              opts={'title': title, 'sample_frequency': sample_rate})
 
 class GatedConv1d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, 
