@@ -15,12 +15,12 @@ from torch.utils.data.sampler import RandomSampler, BatchSampler
 from .muencoder import MuEncoder
 
 class AudioData(Dataset):
-    def __init__(self, track_list, x_len, bitrate=16, twos_comp=True, 
+    def __init__(self, track_list, x_len, y_len=1, bitrate=16, twos_comp=True, 
                  num_classes=256, store_tracks=False, encoder=None):
         self.data = []
         self.tracks = []
         self.x_len = x_len
-        self.y_len = 1
+        self.y_len = y_len
         self.num_channels = 1
         self.num_classes = num_classes
         self.bitrate = bitrate
@@ -39,8 +39,8 @@ class AudioData(Dataset):
                                     'audio': audio, 
                                     'sample_rate': sample_rate})
 
-            for i in range(0, len(audio) - x_len - 1, x_len + 1):
-                x, y = self._extract_segment(audio, x_len, 1, start_idx=i)
+            for i in range(0, len(audio) - x_len - y_len, x_len + y_len):
+                x, y = self._extract_segment(audio, x_len, y_len, start_idx=i)
                 x, y = self.preprocess(x, y)
                 self.data.append({'x': x, 'y': y})
 

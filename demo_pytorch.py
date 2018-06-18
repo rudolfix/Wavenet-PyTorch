@@ -27,6 +27,7 @@ def set_args():
     parser.add_argument('--model_file', type=str, default='model.pt', help='filename of model')
     parser.add_argument('--visdom', type=bool, default=False, help='flag to track variables in visdom')
     parser.add_argument('--new_seq_len', type=int, default=1000, help='length of sequence to predict')
+    parser.add_argument('--device', type=str, default='default', help='device to use')
 
     args = parser.parse_args()
     return args
@@ -34,16 +35,21 @@ def set_args():
 if __name__ == '__main__':
     args = set_args()
 
-    # create dataset and dataloader
-    dataset = AudioData(filelist, args.x_len, num_classes=args.num_classes, 
-                        store_tracks=True)
-    dataloader = AudioLoader(dataset, batch_size=args.batch_size, 
-                             num_workers=args.num_workers)
-
-    # construct and load/train model
+    # construct model
     wave_model = Model(args.x_len, num_channels=1, num_classes=args.num_classes, 
                        num_blocks=args.num_blocks, num_layers=args.num_layers,
                        num_hidden=args.num_hidden, kernel_size=args.kernel_size)
+
+    if not (args.device == 'default'):
+        wave_model.set_device(torch.device(args.device))
+
+    # create dataset and dataloader
+    dataset = AudioData(filelist, args.x_len, y_len=wave_model.output_width - 1,
+                        num_classes=args.num_classes, store_tracks=True)
+    dataloader = AudioLoader(dataset, batch_size=args.batch_size, 
+                             num_workers=args.num_workers)
+
+    # load/train model
     if os.path.isfile(args.model_file):
         print('Loading model data from file: {}'.format(args.model_file))
         wave_model.load_state_dict(torch.load(args.model_file))

@@ -37,17 +37,18 @@ class Model(nn.Module):
         hs = []
         batch_norms = []
 
-        # add causal conv
-        self.causal = nn.Conv1d(num_channels, num_hidden, kernel_size, 
-                                self.output_width, dilation=1)
-        self.causal.name = 'causal'
-
         # add gated convs
+        first = True
         for b in range(num_blocks):
             for i in range(num_layers):
                 rate = 2**i
-                h = GatedResidualBlock(num_hidden, num_hidden, kernel_size, 
-                                       self.output_width, dilation=rate)
+                if first:
+                    h = GatedResidualBlock(num_channels, num_hidden, kernel_size, 
+                                           self.output_width, dilation=rate)
+                    first = False
+                else:
+                    h = GatedResidualBlock(num_hidden, num_hidden, kernel_size,
+                                           self.output_width, dilation=rate)
                 h.name = 'b{}-l{}'.format(b, i)
 
                 hs.append(h)
@@ -62,7 +63,6 @@ class Model(nn.Module):
         self.h_class = nn.Conv1d(num_hidden, num_classes, 2)
 
     def forward(self, x):
-        x = self.causal(x)
         skips = []
         for layer, batch_norm in zip(self.hs, self.batch_norms):
             x, skip = layer(x)
@@ -168,7 +168,7 @@ def _vis_plot(vis, t, title):
     vis.line(t, X=np.array(range(len(t))), win=title, opts={'title': title})
 
 def _vis_audio(vis, gen, t, title, n_samples=50, sample_rate=44100):
-    y = gen.run(t, n_samples, disp_interval=1000).reshape([-1])
+    y = gen.run(t, n_samples, disp_interval=10).reshape([-1])
     t = gen.dataset.encoder.decode(gen.tensor2numpy(t.cpu())).reshape([-1])
     audio = np.concatenate((t, y))
     vis.audio(audio, win=title, 
@@ -216,10 +216,12 @@ class Generator(object):
         self.model = model
         self.dataset = dataset
 
-    def _shift_insert(self, x, val):
-        x = x.narrow(-1, 1, x.shape[-1] - 1)
-        val = val.reshape([1] * len(x.shape))
-        return torch.cat([x, self.dataset._to_tensor(val)], -1)
+    def _shift_insert(self, x, y):
+        x = x.narrow(-1, y.shape[-1], x.shape[-1] - y.shape[-1])
+        dims = [1] * len(x.shape)
+        dims[-1] = y.shape[-1]
+        y = y.reshape(dims)
+        return torch.cat([x, self.dataset._to_tensor(y)], -1)
 
     def tensor2numpy(self, x):
         return x.data.numpy()
@@ -233,17 +235,21 @@ class Generator(object):
         x = self.dataset._to_tensor(self.dataset.preprocess(x))
         x = torch.unsqueeze(x, 0)
 
-        out = np.zeros(num_samples)
-        for i in range(num_samples):
+        y_len = self.dataset.y_len
+        out = np.zeros((num_samples // y_len + 1) * y_len)
+        n_predicted = 0
+        for i in range(num_samples // y_len + 1):
             if disp_interval is not None and i % disp_interval == 0:
-                print('Sample {} / {}'.format(i, num_samples))
+                print('Sample {} / {}'.format(i * y_len, num_samples))
 
             y_i = self.tensor2numpy(self.predict(x).cpu())
             y_i = self.dataset.label2value(y_i.argmax(axis=1))[0]
             y_decoded = self.dataset.encoder.decode(y_i)
-            out[i] = y_decoded
+
+            out[n_predicted:n_predicted + len(y_decoded)] = y_decoded
+            n_predicted += len(y_decoded)
 
             # shift sequence and insert generated value
             x = self._shift_insert(x, y_i)
 
-        return out
+        return out[0:num_samples]
