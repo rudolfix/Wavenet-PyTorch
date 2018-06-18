@@ -36,17 +36,18 @@ class Model(nn.Module):
 
         hs = []
         batch_norms = []
-        first = True
+
+        # add causal conv
+        self.causal = nn.Conv1d(num_channels, num_hidden, kernel_size, 
+                                self.output_width, dilation=1)
+        self.causal.name = 'causal'
+
+        # add gated convs
         for b in range(num_blocks):
             for i in range(num_layers):
                 rate = 2**i
-                if first:
-                    h = GatedResidualBlock(num_channels, num_hidden, kernel_size, self.output_width,
-                                           dilation=rate)
-                    first = False
-                else:
-                    h = GatedResidualBlock(num_hidden, num_hidden, kernel_size, self.output_width,
-                                           dilation=rate)
+                h = GatedResidualBlock(num_hidden, num_hidden, kernel_size, self.output_width,
+                                       dilation=rate)
                 h.name = 'b{}-l{}'.format(b, i)
 
                 hs.append(h)
@@ -61,6 +62,7 @@ class Model(nn.Module):
         self.h_class = nn.Conv1d(num_hidden, num_classes, 2)
 
     def forward(self, x):
+        x = self.causal(x)
         skips = []
         for layer, batch_norm in zip(self.hs, self.batch_norms):
             x, skip = layer(x)
