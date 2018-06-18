@@ -46,8 +46,8 @@ class Model(nn.Module):
         for b in range(num_blocks):
             for i in range(num_layers):
                 rate = 2**i
-                h = GatedResidualBlock(num_hidden, num_hidden, kernel_size, self.output_width,
-                                       dilation=rate)
+                h = GatedResidualBlock(num_hidden, num_hidden, kernel_size, 
+                                       self.output_width, dilation=rate)
                 h.name = 'b{}-l{}'.format(b, i)
 
                 hs.append(h)
@@ -168,7 +168,7 @@ def _vis_plot(vis, t, title):
     vis.line(t, X=np.array(range(len(t))), win=title, opts={'title': title})
 
 def _vis_audio(vis, gen, t, title, n_samples=50, sample_rate=44100):
-    y = gen.run(t, n_samples).reshape([-1])
+    y = gen.run(t, n_samples, disp_interval=1000).reshape([-1])
     t = gen.dataset.encoder.decode(gen.tensor2numpy(t.cpu())).reshape([-1])
     audio = np.concatenate((t, y))
     vis.audio(audio, win=title, 
