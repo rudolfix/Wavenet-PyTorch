@@ -5,12 +5,13 @@ from torch import nn, optim
 from wavenet.audiodata import AudioData, AudioLoader
 from wavenet.models_torch import Model, Generator
 
-from argparse import ArgumentParser
+from horsetools import list_files
 
-filelist = ['assets/classical.wav']
+from argparse import ArgumentParser
 
 def set_args():
     parser = ArgumentParser(description='Wavenet demo')
+    parser.add_argument('--data', type=str, default='./data', help='folder to training set of .wav files')
     parser.add_argument('--x_len', type=int, default=2**15, help='length of input')
     parser.add_argument('--num_classes', type=int, default=256, help='number of discrete output levels')
     parser.add_argument('--num_layers', type=int, default=14, help='number of convolutional layers per block')
@@ -44,6 +45,7 @@ if __name__ == '__main__':
         wave_model.set_device(torch.device(args.device))
 
     # create dataset and dataloader
+    filelist = list_files('./data')
     dataset = AudioData(filelist, args.x_len, y_len=wave_model.output_width - 1,
                         num_classes=args.num_classes, store_tracks=True)
     dataloader = AudioLoader(dataset, batch_size=args.batch_size, 

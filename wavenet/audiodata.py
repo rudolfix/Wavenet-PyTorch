@@ -57,7 +57,6 @@ class AudioData(Dataset):
         # read audio
         sample_rate, audio = wavfile.read(filename)
         assert(audio.dtype == 'int16') # assume audio is int16 for now
-        assert(sample_rate == 44100) # assume sample_rate is 44100 for now
         dtype = audio.dtype
 
         # combine channels
