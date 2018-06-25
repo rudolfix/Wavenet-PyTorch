@@ -92,5 +92,7 @@ ENV/
 # PyTorch Wavenet
 *.swp
 *.pt
+*.wav
 todo.txt
 assets/tmp.wav
+data/
