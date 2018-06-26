@@ -4,8 +4,7 @@ from torch import nn, optim
 
 from wavenet.audiodata import AudioData, AudioLoader
 from wavenet.models import Model, Generator
-
-from horsetools import list_files
+from wavenet.utils import list_files
 
 from argparse import ArgumentParser
 
@@ -14,7 +13,7 @@ def set_args():
     parser.add_argument('--data', type=str, default='./data', help='folder to training set of .wav files')
     parser.add_argument('--x_len', type=int, default=2**15, help='length of input')
     parser.add_argument('--num_classes', type=int, default=256, help='number of discrete output levels')
-    parser.add_argument('--num_layers', type=int, default=14, help='number of convolutional layers per block')
+    parser.add_argument('--num_layers', type=int, default=13, help='number of convolutional layers per block')
     parser.add_argument('--num_blocks', type=int, default=2, help='number of repeating convolutional layer blocks')
     parser.add_argument('--num_hidden', type=int, default=32, help='number of neurons per layer')
     parser.add_argument('--kernel_size', type=int, default=2, help='width of convolutional kernel')
