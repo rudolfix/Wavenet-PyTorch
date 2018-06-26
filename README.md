@@ -4,7 +4,7 @@
     <img src="assets/naive-implementation.png" height="300">
 </p>
 
-This repository is based on [Fast Wavenet](https://github.com/tomlepaine/fast-wavenet.git) by Github user [tomlepaine](https://github.com/tomlepaine) and the original Wavenet implementation by DeepMind [blog post](https://deepmind.com/blog/wavenet-generative-model-raw-audio/).
+This repository is based on [Fast Wavenet](https://github.com/tomlepaine/fast-wavenet.git) by Github user [tomlepaine](https://github.com/tomlepaine) and the original Wavenet implementation by [DeepMind](https://deepmind.com/blog/wavenet-generative-model-raw-audio/).
 
 ## Installation
 This project requires the following dependencies:
