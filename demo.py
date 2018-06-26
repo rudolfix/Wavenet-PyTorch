@@ -10,7 +10,7 @@ from argparse import ArgumentParser
 
 def set_args():
     parser = ArgumentParser(description='Wavenet demo')
-    parser.add_argument('--data', type=str, default='./data', help='folder to training set of .wav files')
+    parser.add_argument('--data', type=str, default='./audio', help='folder to training set of .wav files')
     parser.add_argument('--x_len', type=int, default=2**15, help='length of input')
     parser.add_argument('--num_classes', type=int, default=256, help='number of discrete output levels')
     parser.add_argument('--num_layers', type=int, default=13, help='number of convolutional layers per block')
@@ -74,4 +74,4 @@ if __name__ == '__main__':
     wave_generator = Generator(wave_model, dataset)
     y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], 
                            args.new_seq_len, disp_interval=100)
-    dataset.save_wav('assets/tmp.wav', y, 44100)
+    dataset.save_wav('./tmp.wav', y, 44100)
