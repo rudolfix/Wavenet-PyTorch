@@ -74,4 +74,4 @@ if __name__ == '__main__':
     wave_generator = Generator(wave_model, dataset)
     y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], 
                            args.new_seq_len, disp_interval=100)
-    dataset.save_wav('./tmp.wav', y, 44100)
+    dataset.save_wav('./tmp.wav', y, dataloader.dataset.sample_rate)
