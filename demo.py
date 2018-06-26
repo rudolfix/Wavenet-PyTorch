@@ -3,7 +3,7 @@ import torch
 from torch import nn, optim
 
 from wavenet.audiodata import AudioData, AudioLoader
-from wavenet.models_torch import Model, Generator
+from wavenet.models import Model, Generator
 
 from horsetools import list_files
 

@@ -1,157 +1,255 @@
-import matplotlib.pyplot as plt
+import time, copy
+from collections import OrderedDict
+from functools import reduce
 import numpy as np
-import tensorflow as tf
-from layers import (_causal_linear, _output_linear, conv1d,
-                    dilated_conv1d)
+import matplotlib.pyplot as plt
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import visdom
 
-class Model(object):
-    def __init__(self,
+class Model(nn.Module):
+    def __init__(self, 
                  num_time_samples,
                  num_channels=1,
                  num_classes=256,
                  num_blocks=2,
                  num_layers=14,
                  num_hidden=128,
-                 gpu_fraction=1.0):
-        
+                 kernel_size=2):
+        super(Model, self).__init__()
         self.num_time_samples = num_time_samples
         self.num_channels = num_channels
         self.num_classes = num_classes
         self.num_blocks = num_blocks
         self.num_layers = num_layers
         self.num_hidden = num_hidden
-        self.gpu_fraction = gpu_fraction
+        self.kernel_size = kernel_size
+        self.receptive_field = 1 + (kernel_size - 1) * \
+                               num_blocks * sum([2**k for k in range(num_layers)])
+        self.output_width = num_time_samples - self.receptive_field + 1
+        print('receptive_field: {}'.format(self.receptive_field))
+        print('Output width: {}'.format(self.output_width))
         
-        inputs = tf.placeholder(tf.float32,
-                                shape=(None, num_time_samples, num_channels))
-        targets = tf.placeholder(tf.int32, shape=(None, num_time_samples))
+        self.set_device()
 
-        h = inputs
         hs = []
+        batch_norms = []
+
+        # add gated convs
+        first = True
         for b in range(num_blocks):
             for i in range(num_layers):
                 rate = 2**i
-                name = 'b{}-l{}'.format(b, i)
-                h = dilated_conv1d(h, num_hidden, rate=rate, name=name)
+                if first:
+                    h = GatedResidualBlock(num_channels, num_hidden, kernel_size, 
+                                           self.output_width, dilation=rate)
+                    first = False
+                else:
+                    h = GatedResidualBlock(num_hidden, num_hidden, kernel_size,
+                                           self.output_width, dilation=rate)
+                h.name = 'b{}-l{}'.format(b, i)
+
                 hs.append(h)
+                batch_norms.append(nn.BatchNorm1d(num_hidden))
 
-        outputs = conv1d(h,
-                         num_classes,
-                         filter_width=1,
-                         gain=1.0,
-                         activation=None,
-                         bias=True)
+        self.hs = nn.ModuleList(hs)
+        self.batch_norms = nn.ModuleList(batch_norms)
+        self.relu_1 = nn.ReLU()
+        self.conv_1_1 = nn.Conv1d(num_hidden, num_hidden, 1)
+        self.relu_2 = nn.ReLU()
+        self.conv_1_2 = nn.Conv1d(num_hidden, num_hidden, 1)
+        self.h_class = nn.Conv1d(num_hidden, num_classes, 2)
 
-        costs = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            outputs, targets)
-        cost = tf.reduce_mean(costs)
+    def forward(self, x):
+        skips = []
+        for layer, batch_norm in zip(self.hs, self.batch_norms):
+            x, skip = layer(x)
+            x = batch_norm(x)
+            skips.append(skip)
 
-        train_step = tf.train.AdamOptimizer(learning_rate=0.001).minimize(cost)
+        x = reduce((lambda a, b : torch.add(a, b)), skips)
+        x = self.relu_1(self.conv_1_1(x))
+        x = self.relu_2(self.conv_1_2(x))
+        return self.h_class(x)
 
-        gpu_options = tf.GPUOptions(
-            per_process_gpu_memory_fraction=gpu_fraction)
-        sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
-        sess.run(tf.initialize_all_variables())
+    def set_device(self, device=None):
+        if device is None:
+            self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = device
 
-        self.inputs = inputs
-        self.targets = targets
-        self.outputs = outputs
-        self.hs = hs
-        self.costs = costs
-        self.cost = cost
-        self.train_step = train_step
-        self.sess = sess
+    def train(self, dataloader, num_epochs=25, validation=False, disp_interval=None, use_visdom=False):
+        since = time.time()
+        
+        self.to(self.device)
 
-    def _train(self, inputs, targets):
-        feed_dict = {self.inputs: inputs, self.targets: targets}
-        cost, _ = self.sess.run(
-            [self.cost, self.train_step],
-            feed_dict=feed_dict)
-        return cost
+        if validation:
+            phase = 'Validation'
+        else:
+            phase = 'Training'
 
-    def train(self, inputs, targets):
+        if use_visdom:
+            vis = visdom.Visdom()
+            gen = Generator(self, dataloader.dataset)
+        else:
+            vis = None
+
         losses = []
-        terminal = False
-        i = 0
-        while not terminal:
-            i += 1
-            cost = self._train(inputs, targets)
-            if cost < 1e-1:
-                terminal = True
-            losses.append(cost)
-            if i % 50 == 0:
-                plt.plot(losses)
-                plt.show()
+        for epoch in range(1, num_epochs + 1):
+            if not validation:
+                self.scheduler.step()
+                super().train()
+            else:
+                self.eval()
+                
+            # reset loss for current phase and epoch
+            running_loss = 0.0
+            running_corrects = 0
+            
+            for inputs, labels in dataloader:
+                inputs = inputs.to(self.device)
+                labels = labels.to(self.device)
+                
+                self.optimizer.zero_grad()
+                
+                # track history only during training phase
+                with torch.set_grad_enabled(not validation):
+                    outputs = self(inputs)
+                    loss = self.criterion(outputs, labels)
+                    
+                    if not validation:
+                        loss.backward()
+                        self.optimizer.step()
+                        
+                running_loss += loss.item() * inputs.size(1)
 
+            losses.append(running_loss)
+            if disp_interval is not None and epoch % disp_interval == 0:
+                epoch_loss = running_loss / len(dataloader)
+                print('Epoch {} / {}'.format(epoch, num_epochs))
+                print('Learning Rate: {}'.format(self.scheduler.get_lr()))
+                print('{} Loss: {}'.format(phase, epoch_loss))
+                print('-' * 10)
+                print()
+
+                if vis is not None:
+                    # display network weights
+                    for m in self.hs:
+                        _vis_hist(vis, m.gatedconv.conv_f.weight, 
+                                  m.name + ' ' + 'W-conv_f')
+                        _vis_hist(vis, m.gatedconv.conv_g.weight, 
+                                  m.name + ' ' + 'W-conv_g')
+                        _vis_hist(vis, m.gatedconv.conv_f.bias,
+                                  m.name + ' ' + 'b-conv_f')
+                        _vis_hist(vis, m.gatedconv.conv_g.bias, 
+                                  m.name + ' ' + 'b-conv_g')
+
+                    # display raw outputs
+                    _vis_hist(vis, outputs, 'Outputs')
+
+                    # display loss over time
+                    _vis_plot(vis, np.array(losses) / len(dataloader), 'Losses')
+
+                    # display audio sample
+                    _vis_audio(vis, gen, inputs[0], 'Sample Audio', n_samples=44100,
+                               sample_rate=dataloader.dataset.sample_rate)
+
+
+def _flatten(t):
+    t = t.to(torch.device('cpu'))
+    return t.data.numpy().reshape([-1])
+
+def _vis_hist(vis, t, title):
+    vis.histogram(_flatten(t), win=title, opts={'title': title})
+
+def _vis_plot(vis, t, title):
+    vis.line(t, X=np.array(range(len(t))), win=title, opts={'title': title})
+
+def _vis_audio(vis, gen, t, title, n_samples=50, sample_rate=44100):
+    y = gen.run(t, n_samples, disp_interval=10).reshape([-1])
+    t = gen.dataset.encoder.decode(gen.tensor2numpy(t.cpu())).reshape([-1])
+    audio = np.concatenate((t, y))
+    vis.audio(audio, win=title, 
+              opts={'title': title, 'sample_frequency': sample_rate})
+
+class GatedConv1d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, 
+                 dilation=1, groups=1, bias=True):
+        super(GatedConv1d, self).__init__()
+        self.dilation = dilation
+        self.conv_f = nn.Conv1d(in_channels, out_channels, kernel_size, 
+                                stride=stride, padding=padding, dilation=dilation, 
+                                groups=groups, bias=bias)
+        self.conv_g = nn.Conv1d(in_channels, out_channels, kernel_size, 
+                                stride=stride, padding=padding, dilation=dilation, 
+                                groups=groups, bias=bias)
+        self.sig = nn.Sigmoid()
+
+    def forward(self, x):
+        padding = self.dilation - (x.shape[-1] + self.dilation - 1) % self.dilation
+        x = nn.functional.pad(x, (self.dilation, 0))
+        return torch.mul(self.conv_f(x), self.sig(self.conv_g(x)))
+
+class GatedResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, output_width, stride=1, padding=0, 
+                 dilation=1, groups=1, bias=True):
+        super(GatedResidualBlock, self).__init__()
+        self.output_width = output_width
+        self.gatedconv = GatedConv1d(in_channels, out_channels, kernel_size, 
+                                     stride=stride, padding=padding, 
+                                     dilation=dilation, groups=groups, bias=bias)
+        self.conv_1 = nn.Conv1d(out_channels, out_channels, 1, stride=1, padding=0,
+                                dilation=1, groups=1, bias=bias)
+
+    def forward(self, x):
+        skip = self.conv_1(self.gatedconv(x))
+        residual = torch.add(skip, x)
+
+        skip_cut = skip.shape[-1] - self.output_width
+        skip = skip.narrow(-1, skip_cut, self.output_width)
+        return residual, skip
 
 class Generator(object):
-    def __init__(self, model, batch_size=1, input_size=1):
+    def __init__(self, model, dataset):
         self.model = model
-        self.bins = np.linspace(-1, 1, self.model.num_classes)
+        self.dataset = dataset
 
-        inputs = tf.placeholder(tf.float32, [batch_size, input_size],
-                                name='inputs')
+    def _shift_insert(self, x, y):
+        x = x.narrow(-1, y.shape[-1], x.shape[-1] - y.shape[-1])
+        dims = [1] * len(x.shape)
+        dims[-1] = y.shape[-1]
+        y = y.reshape(dims)
+        return torch.cat([x, self.dataset._to_tensor(y)], -1)
 
-        print('Make Generator.')
+    def tensor2numpy(self, x):
+        return x.data.numpy()
 
-        count = 0
-        h = inputs
+    def predict(self, x):
+        x = x.to(self.model.device)
+        self.model.to(self.model.device)
+        return self.model(x)
 
-        init_ops = []
-        push_ops = []
-        for b in range(self.model.num_blocks):
-            for i in range(self.model.num_layers):
-                rate = 2**i
-                name = 'b{}-l{}'.format(b, i)
-                if count == 0:
-                    state_size = 1
-                else:
-                    state_size = self.model.num_hidden
-                    
-                q = tf.FIFOQueue(rate,
-                                 dtypes=tf.float32,
-                                 shapes=(batch_size, state_size))
-                init = q.enqueue_many(tf.zeros((rate, batch_size, state_size)))
+    def run(self, x, num_samples, disp_interval=None):
+        x = self.dataset._to_tensor(self.dataset.preprocess(x))
+        x = torch.unsqueeze(x, 0)
 
-                state_ = q.dequeue()
-                push = q.enqueue([h])
-                init_ops.append(init)
-                push_ops.append(push)
+        y_len = self.dataset.y_len
+        out = np.zeros((num_samples // y_len + 1) * y_len)
+        n_predicted = 0
+        for i in range(num_samples // y_len + 1):
+            if disp_interval is not None and i % disp_interval == 0:
+                print('Sample {} / {}'.format(i * y_len, num_samples))
 
-                h = _causal_linear(h, state_, name=name, activation=tf.nn.relu)
-                count += 1
+            y_i = self.tensor2numpy(self.predict(x).cpu())
+            y_i = self.dataset.label2value(y_i.argmax(axis=1))[0]
+            y_decoded = self.dataset.encoder.decode(y_i)
 
-        outputs = _output_linear(h)
+            out[n_predicted:n_predicted + len(y_decoded)] = y_decoded
+            n_predicted += len(y_decoded)
 
-        out_ops = [tf.nn.softmax(outputs)]
-        out_ops.extend(push_ops)
+            # shift sequence and insert generated value
+            x = self._shift_insert(x, y_i)
 
-        self.inputs = inputs
-        self.init_ops = init_ops
-        self.out_ops = out_ops
-        
-        # Initialize queues.
-        self.model.sess.run(self.init_ops)
-
-    def run(self, input, num_samples):
-        predictions = []
-        for step in range(num_samples):
-
-            feed_dict = {self.inputs: input}
-            output = self.model.sess.run(self.out_ops, feed_dict=feed_dict)[0] # ignore push ops
-            value = np.argmax(output[0, :])
-
-            input = np.array(self.bins[value])[None, None]
-            predictions.append(input)
-
-            if step % 1000 == 0:
-                predictions_ = np.concatenate(predictions, axis=1)
-                plt.plot(predictions_[0, :], label='pred')
-                plt.legend()
-                plt.xlabel('samples from start')
-                plt.ylabel('signal')
-                plt.show()
-
-        predictions_ = np.concatenate(predictions, axis=1)
-        return predictions_
+        return out[0:num_samples]
