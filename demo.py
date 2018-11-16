@@ -28,6 +28,7 @@ def set_args():
     parser.add_argument('--visdom', type=bool, default=False, help='flag to track variables in visdom')
     parser.add_argument('--new_seq_len', type=int, default=1000, help='length of sequence to predict')
     parser.add_argument('--device', type=str, default='default', help='device to use')
+    parser.add_argument('--resume_train', type=bool, default=False, help='whether to resume training existing models')
 
     args = parser.parse_args()
     return args
@@ -44,19 +45,30 @@ if __name__ == '__main__':
         wave_model.set_device(torch.device(args.device))
 
     # create dataset and dataloader
-    filelist = list_files('./data')
+    filelist = list_files(args.data)
     dataset = AudioData(filelist, args.x_len, y_len=wave_model.output_width - 1,
                         num_classes=args.num_classes, store_tracks=True)
-    dataloader = AudioLoader(dataset, batch_size=args.batch_size, 
+
+    # manage small datasets with big batch sizes
+    if args.batch_size > len(dataset):
+        args.batch_size = len(dataset)
+    
+    dataloader = AudioLoader(dataset, batch_size=args.batch_size,
                              num_workers=args.num_workers)
 
     # load/train model
     if os.path.isfile(args.model_file):
         print('Loading model data from file: {}'.format(args.model_file))
         wave_model.load_state_dict(torch.load(args.model_file))
+
+        if args.resume_train:
+            print('Resuming training.')
     else:
         print('Model data not found: {}'.format(args.model_file))
         print('Training new model.')
+        args.resume_train = True
+
+    if args.resume_train:
         wave_model.criterion = nn.CrossEntropyLoss()
         wave_model.optimizer = optim.Adam(wave_model.parameters(), 
                                           lr=args.learn_rate)
@@ -64,8 +76,11 @@ if __name__ == '__main__':
                                                          step_size=args.step_size, 
                                                          gamma=args.gamma)
 
-        wave_model.train(dataloader, num_epochs=args.num_epochs, 
-                         disp_interval=args.disp_interval, use_visdom=args.visdom)
+        try:
+            wave_model.train(dataloader, num_epochs=args.num_epochs, 
+                             disp_interval=args.disp_interval, use_visdom=args.visdom)
+        except KeyboardInterrupt:
+            print('Training stopped!')
 
         print('Saving model data to file: {}'.format(args.model_file))
         torch.save(wave_model.state_dict(), args.model_file)
