@@ -1,6 +1,7 @@
 import time, copy
 from collections import OrderedDict
 from functools import reduce
+from tempfile import NamedTemporaryFile
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -8,6 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import visdom
+
 
 class Model(nn.Module):
     def __init__(self, 
@@ -99,7 +101,6 @@ class Model(nn.Module):
         losses = []
         for epoch in range(1, num_epochs + 1):
             if not validation:
-                self.scheduler.step()
                 super().train()
             else:
                 self.eval()
@@ -122,6 +123,7 @@ class Model(nn.Module):
                     if not validation:
                         loss.backward()
                         self.optimizer.step()
+                        self.scheduler.step()
                         
                 running_loss += loss.item() * inputs.size(1)
 
@@ -129,10 +131,13 @@ class Model(nn.Module):
             if disp_interval is not None and epoch % disp_interval == 0:
                 epoch_loss = running_loss / len(dataloader)
                 print('Epoch {} / {}'.format(epoch, num_epochs))
-                print('Learning Rate: {}'.format(self.scheduler.get_lr()))
+                print('Learning Rate: {}'.format(self.scheduler.get_last_lr()))
                 print('{} Loss: {}'.format(phase, epoch_loss))
                 print('-' * 10)
                 print()
+                with NamedTemporaryFile("wb", prefix="wavenet_", delete=False) as f:
+                    print('Saving model data to file: {}'.format(f.name))
+                    torch.save(self.state_dict(), f)
 
                 if vis is not None:
                     # display network weights
@@ -153,8 +158,8 @@ class Model(nn.Module):
                     _vis_plot(vis, np.array(losses) / len(dataloader), 'Losses')
 
                     # display audio sample
-                    _vis_audio(vis, gen, inputs[0], 'Sample Audio', n_samples=44100,
-                               sample_rate=dataloader.dataset.sample_rate)
+                    # _vis_audio(vis, gen, inputs[0], 'Sample Audio', n_samples=44100,
+                    #            sample_rate=dataloader.dataset.sample_rate)
 
 
 def _flatten(t):

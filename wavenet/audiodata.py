@@ -108,7 +108,7 @@ class AudioData(Dataset):
             dtype = self.dtype
 
         data = data.astype(dtype)
-        return wavfile.write(filename, self.sample_rate, data)
+        return wavfile.write(filename, sample_rate, data)
 
     def label2value(self, label):
         return self.bins[label.astype(int)]
