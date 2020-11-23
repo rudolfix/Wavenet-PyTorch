@@ -168,7 +168,7 @@ class Model(nn.Module):
                     # display audio sample
                     i = gen.tensor2numpy(inputs[0].cpu()).reshape([-1])
                     t = gen.dataset.encoder.unapply_mu(i)
-                    y = gen.run(inputs[0], dataloader.dataset.sample_rate, disp_interval=10, raw_data=True).reshape([-1])
+                    y = gen.run(inputs[0].cpu(), dataloader.dataset.sample_rate, disp_interval=10, raw_data=True).reshape([-1])
                     writer.add_audio("Input Sample", t, epoch, dataloader.dataset.sample_rate)
                     writer.add_audio("Input Sample Raw", i, epoch, dataloader.dataset.sample_rate)
                     writer.add_audio("Prediction", gen.dataset.encoder.unapply_mu(y), epoch, dataloader.dataset.sample_rate)
@@ -188,9 +188,12 @@ class Model(nn.Module):
 
     def load_state(self, f):
         state = torch.load(f)
-        self.optimizer.load_state_dict(state["optimizer"])
-        self.scheduler.load_state_dict(state["scheduler"])
-        self.load_state_dict(state["model"])
+        if "model" in state:
+            self.optimizer.load_state_dict(state["optimizer"])
+            self.scheduler.load_state_dict(state["scheduler"])
+            self.load_state_dict(state["model"])
+        else:
+            self.load_state_dict(state)
 
 
 # def _flatten(t):

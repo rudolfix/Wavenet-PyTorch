@@ -1,4 +1,5 @@
 jupyter==1.0.0
 matplotlib==3.3.3
 torch==1.7.0
-visdom==0.1.8.9
+tensorboard==2.4.0
+# visdom==0.1.8.9
