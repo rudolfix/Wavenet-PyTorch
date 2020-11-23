@@ -33,6 +33,7 @@ def set_args():
     args = parser.parse_args()
     return args
 
+
 if __name__ == '__main__':
     args = set_args()
 
@@ -55,11 +56,16 @@ if __name__ == '__main__':
     
     dataloader = AudioLoader(dataset, batch_size=args.batch_size,
                              num_workers=args.num_workers)
+    wave_model.optimizer = optim.Adam(wave_model.parameters(),
+                                      lr=args.learn_rate)
+    wave_model.scheduler = optim.lr_scheduler.StepLR(wave_model.optimizer,
+                                                     step_size=args.step_size,
+                                                     gamma=args.gamma)
 
     # load/train model
     if os.path.isfile(args.model_file):
         print('Loading model data from file: {}'.format(args.model_file))
-        wave_model.load_state_dict(torch.load(args.model_file))
+        wave_model.load_state(args.model_file)
 
         if args.resume_train:
             print('Resuming training.')
@@ -70,11 +76,6 @@ if __name__ == '__main__':
 
     if args.resume_train:
         wave_model.criterion = nn.CrossEntropyLoss()
-        wave_model.optimizer = optim.Adam(wave_model.parameters(), 
-                                          lr=args.learn_rate)
-        wave_model.scheduler = optim.lr_scheduler.StepLR(wave_model.optimizer, 
-                                                         step_size=args.step_size, 
-                                                         gamma=args.gamma)
 
         try:
             wave_model.train(dataloader, num_epochs=args.num_epochs, 
@@ -83,7 +84,7 @@ if __name__ == '__main__':
             print('Training stopped!')
 
         print('Saving model data to file: {}'.format(args.model_file))
-        torch.save(wave_model.state_dict(), args.model_file)
+        wave_model.save_state(args.model_file)
 
     # predict sequence with model
     wave_generator = Generator(wave_model, dataset)
