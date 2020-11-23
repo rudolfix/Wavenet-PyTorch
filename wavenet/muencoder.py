@@ -50,10 +50,14 @@ class MuEncoder(object):
         span = self.datarange[1] - self.datarange[0]
         return (x / 2 + 0.5) * span + self.datarange[0]
 
-    def encode(self, x):
-        x = self.normalize(x)
+    def apply_mu(self, x):
         return np.sign(x) * np.log(1 + self.mu * np.abs(x)) / np.log(1 + self.mu)
 
+    def unapply_mu(self, x):
+        return np.sign(x) * self.mu**-1 * ((1 + self.mu)**np.abs(x) - 1)
+
+    def encode(self, x):
+        return self.apply_mu(self.normalize(x))
+
     def decode(self, x):
-        x = np.sign(x) * self.mu**-1 * ((1 + self.mu)**np.abs(x) - 1)
-        return self.expand(x)
+        return self.expand(self.unapply_mu(x))
