@@ -187,7 +187,7 @@ class Model(nn.Module):
         torch.save(state, f)
 
     def load_state(self, f):
-        state = torch.load(f)
+        state = torch.load(f, map_location=lambda storage, loc: storage)
         if "model" in state:
             self.optimizer.load_state_dict(state["optimizer"])
             self.scheduler.load_state_dict(state["scheduler"])
@@ -277,9 +277,9 @@ class Generator(object):
         return self.model(x)
 
     def run(self, x, num_samples, disp_interval=None, raw_data=False):
-        if not raw_data:
-            x = self.dataset._to_tensor(self.dataset.preprocess(x))
-
+        # must call with preprocessed data
+        # if not raw_data:
+        #     x = self.dataset._to_tensor(self.dataset.preprocess(x))
         x = torch.unsqueeze(x, 0)
 
         y_len = self.dataset.y_len
