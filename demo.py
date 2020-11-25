@@ -1,5 +1,6 @@
 import os
 import torch
+import numpy as np
 from torch import nn, optim
 
 from wavenet.audiodata import AudioData, AudioLoader
@@ -65,7 +66,7 @@ if __name__ == '__main__':
     # load/train model
     if os.path.isfile(args.model_file):
         print('Loading model data from file: {}'.format(args.model_file))
-        wave_model.load_state(args.model_file)
+        wave_model.load_state(args.model_file, storage=args.device)
 
         if args.resume_train:
             print('Resuming training.')
@@ -88,6 +89,9 @@ if __name__ == '__main__':
 
     # predict sequence with model
     wave_generator = Generator(wave_model, dataset)
-    y = wave_generator.run(dataset.tracks[0]['audio'][:args.x_len], 
-                           args.new_seq_len, disp_interval=100)
+    # get random sample
+    sample_idx = np.random.randint(0, high=len(dataset.data))
+    sample = dataset.data[sample_idx]["x"]
+    y = wave_generator.run(dataset._to_tensor(sample), args.new_seq_len, disp_interval=100)
     dataset.save_wav('./tmp.wav', y, dataloader.dataset.sample_rate)
+    dataset.save_wav('./tmp-orig.wav', dataloader.dataset.encoder.decode(sample), dataloader.dataset.sample_rate)
